@@ -84,20 +84,25 @@ class Registro:
         return Registro(atributos_norm)
 
     def k_vecinos(self, lista_registros: List['Registro'], k: int, tipo: str = "euclídea", pesos: List[float] = None) -> List[int]:
-        """
-        Devuelve una lista con los índices de los 'k' registros más cercanos al objeto que invoca.
-        """
-        distancias = []
-        for indice, registro in enumerate(lista_registros):
-            dist = self.calcula_distancia(registro, tipo, pesos)
-            distancias.append((dist, indice))
+            """
+            Devuelve una lista con los índices de los 'k' registros más cercanos al objeto que invoca.
+            Omite al propio objeto si se encuentra dentro de la lista pasada como parámetro.
+            """
+            distancias = []
+            for indice, registro in enumerate(lista_registros):
+                # Comprobamos si el registro actual de la lista es exactamente el mismo objeto que invoca
+                if registro is self:
+                    continue  # Saltamos a la siguiente iteración, omitiendo este punto
+                    
+                dist = self.calcula_distancia(registro, tipo, pesos)
+                distancias.append((dist, indice))
+                
+            # Ordenamos por distancia de menor a mayor (el primer elemento de la tupla: dist)
+            distancias.sort(key=lambda x: x[0])
             
-        # Ordenamos por distancia (el primer elemento de la tupla)
-        distancias.sort(key=lambda x: x[0])
-        
-        # Extraemos solo los índices de los primeros k elementos
-        indices_k_vecinos = [item[1] for item in distancias[:k]]
-        return indices_k_vecinos
+            # Extraemos solo los índices de los primeros k elementos
+            indices_k_vecinos = [item[1] for item in distancias[:k]]
+            return indices_k_vecinos
 
     def __str__(self) -> str:
         """Representación amigable para imprimir (ej. con print)."""
