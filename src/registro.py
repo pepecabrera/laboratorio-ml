@@ -1,23 +1,21 @@
 import math
-from typing import List
+from typing import List, Union
 
 class Registro:
     """
-    Representa un conjunto de puntos en un espacio n-dimensional para 
-    algoritmos de Machine Learning (Clasificación Supervisada).
+    Clase base que representa un conjunto de puntos en un espacio n-dimensional.
     """
     
-    def __init__(self, atributos: List[float]):
+    def __init__(self, atributos: List[float], objetivo=None):
         """
-        Constructor que acepta un vector de números flotantes.
+        Constructor de la clase base.
+        Se inicializa el objetivo a None por defecto para la clase base.
         """
         self.atributos = atributos
+        self.objetivo = objetivo
 
     def _validar_dimensiones(self, otra_lista: List[float], nombre_lista: str = "la otra lista"):
-        """
-        Método auxiliar privado para validar que las dimensiones coincidan
-        antes de realizar operaciones matemáticas.
-        """
+        """Método auxiliar privado para validar que las dimensiones coincidan."""
         if len(self.atributos) != len(otra_lista):
             raise ValueError(
                 f"Las dimensiones no coinciden. Este registro tiene dimensión {len(self.atributos)}, "
@@ -25,24 +23,18 @@ class Registro:
             )
 
     def distancia_euclidea(self, otro: 'Registro') -> float:
-        """
-        Calcula la distancia Euclidiana entre este registro y otro.
-        """
+        """Calcula la distancia Euclidiana entre este registro y otro."""
         self._validar_dimensiones(otro.atributos, "el otro registro")
         suma_cuadrados = sum((p - q) ** 2 for p, q in zip(self.atributos, otro.atributos))
         return math.sqrt(suma_cuadrados)
 
     def distancia_manhattan(self, otro: 'Registro') -> float:
-        """
-        Calcula la distancia Manhattan entre este registro y otro.
-        """
+        """Calcula la distancia Manhattan entre este registro y otro."""
         self._validar_dimensiones(otro.atributos, "el otro registro")
         return sum(abs(p - q) for p, q in zip(self.atributos, otro.atributos))
 
     def distancia_ponderada(self, otro: 'Registro', pesos: List[float]) -> float:
-        """
-        Calcula la distancia ponderada utilizando una lista de pesos.
-        """
+        """Calcula la distancia ponderada utilizando una lista de pesos."""
         self._validar_dimensiones(otro.atributos, "el otro registro")
         self._validar_dimensiones(pesos, "la lista de pesos")
         
@@ -50,10 +42,7 @@ class Registro:
         return math.sqrt(suma_ponderada)
 
     def calcula_distancia(self, otro: 'Registro', tipo: str = "euclídea", pesos: List[float] = None) -> float:
-        """
-        Calcula la distancia según el tipo especificado ("euclídea", "manhattan" o "ponderada").
-        Por defecto es "euclídea".
-        """
+        """Calcula la distancia según el tipo especificado."""
         tipo = tipo.lower()
         if tipo == "manhattan":
             return self.distancia_manhattan(otro)
@@ -66,8 +55,8 @@ class Registro:
 
     def normalizar(self, minimos: List[float], maximos: List[float]) -> 'Registro':
         """
-        Devuelve un nuevo Registro con los valores de los atributos normalizados.
-        Asigna 0.0 si el rango (max - min) es 0 para evitar divisiones por cero.
+        Devuelve un nuevo objeto de la MISMA CLASE que lo invoca, 
+        con los valores de los atributos normalizados.
         """
         self._validar_dimensiones(minimos, "la lista de mínimos")
         self._validar_dimensiones(maximos, "la lista de máximos")
@@ -81,33 +70,60 @@ class Registro:
                 x_prima = (x - min_val) / rango
                 atributos_norm.append(x_prima)
                 
-        return Registro(atributos_norm)
+        # Polimorfismo: self.__class__ creará un Registro, RegistroClasificacion o RegistroRegresion
+        # según qué objeto haya llamado a la función.
+        nuevo_registro = self.__class__(atributos_norm, self.objetivo)
+        return nuevo_registro
 
     def k_vecinos(self, lista_registros: List['Registro'], k: int, tipo: str = "euclídea", pesos: List[float] = None) -> List[int]:
-            """
-            Devuelve una lista con los índices de los 'k' registros más cercanos al objeto que invoca.
-            Omite al propio objeto si se encuentra dentro de la lista pasada como parámetro.
-            """
-            distancias = []
-            for indice, registro in enumerate(lista_registros):
-                # Comprobamos si el registro actual de la lista es exactamente el mismo objeto que invoca
-                if registro is self:
-                    continue  # Saltamos a la siguiente iteración, omitiendo este punto
-                    
-                dist = self.calcula_distancia(registro, tipo, pesos)
-                distancias.append((dist, indice))
+        """
+        Devuelve una lista con los índices de los 'k' registros más cercanos.
+        Omite al propio objeto si está en la lista.
+        """
+        distancias = []
+        for indice, registro in enumerate(lista_registros):
+            if registro is self:
+                continue
                 
-            # Ordenamos por distancia de menor a mayor (el primer elemento de la tupla: dist)
-            distancias.sort(key=lambda x: x[0])
+            dist = self.calcula_distancia(registro, tipo, pesos)
+            distancias.append((dist, indice))
             
-            # Extraemos solo los índices de los primeros k elementos
-            indices_k_vecinos = [item[1] for item in distancias[:k]]
-            return indices_k_vecinos
+        distancias.sort(key=lambda x: x[0])
+        indices_k_vecinos = [item[1] for item in distancias[:k]]
+        return indices_k_vecinos
 
     def __str__(self) -> str:
-        """Representación amigable para imprimir (ej. con print)."""
-        return f"Registro({[round(x, 4) for x in self.atributos]})"
+        return f"{self.__class__.__name__}({[round(x, 4) for x in self.atributos]})"
 
     def __repr__(self) -> str:
-        """Representación formal y detallada del objeto para depuración."""
-        return f"Registro(atributos={self.atributos})"
+        return f"{self.__class__.__name__}(atributos={self.atributos}, objetivo={self.objetivo})"
+
+
+# ==========================================
+# ETAPA 1: CLASES HIJAS (NUEVO)
+# ==========================================
+
+class RegistroClasificacion(Registro):
+    """
+    Registro para problemas de clasificación, donde el objetivo es una categoría (etiqueta).
+    """
+    def __init__(self, atributos: List[float], objetivo: str):
+        # Invocamos al constructor de la clase padre
+        super().__init__(atributos, objetivo)
+        
+    def __repr__(self) -> str:
+        # Redefinición para mostrar explícitamente que es una etiqueta (string)
+        return f"RegistroClasificacion(atributos={self.atributos}, etiqueta='{self.objetivo}')"
+
+
+class RegistroRegresion(Registro):
+    """
+    Registro para problemas de regresión, donde el objetivo es un valor numérico real.
+    """
+    def __init__(self, atributos: List[float], objetivo: float):
+        # Invocamos al constructor de la clase padre
+        super().__init__(atributos, objetivo)
+
+    def __repr__(self) -> str:
+        # Redefinición para mostrar explícitamente que es un valor numérico
+        return f"RegistroRegresion(atributos={self.atributos}, valor={self.objetivo})"

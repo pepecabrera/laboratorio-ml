@@ -1,77 +1,126 @@
 import random
-from registro import Registro
+from factoria import FactoriaCSV
+from modelos import Clasificador_kNN
+
+def evaluar_dataset(dataset, nombre_dataset):
+    """
+    Evalúa un dataset con distintas configuraciones del clasificador kNN.
+    """
+    print(f"\n{'='*60}")
+    print(f"📊 EVALUANDO DATASET: {nombre_dataset.upper()}")
+    print(f"{'='*60}")
+
+    # Aunque el PDF dice que la validación formal se verá en el próximo lab,
+    # hacemos una partición aleatoria muy básica (80% / 20%) para poder 
+    # calcular una precisión (accuracy) que tenga sentido.
+    registros = dataset.registros.copy()
+    random.seed(42)  # Semilla para que los resultados sean reproducibles
+    random.shuffle(registros)
+
+    corte = int(len(registros) * 0.8)
+    train_ds = dataset.crear_subconjunto(registros[:corte])
+    test_ds  = dataset.crear_subconjunto(registros[corte:])
+
+    print(f"Total registros: {len(registros)} -> Entrenamiento: {len(train_ds.registros)} | Test: {len(test_ds.registros)}")
+    print("-" * 60)
+
+    # Combinaciones a probar solicitadas en la práctica
+    valores_k = [1, 3, 5, 7, 9]
+    distancias = ["euclídea", "manhattan"]
+
+    mejor_accuracy = -1.0
+    mejor_config = ""
+
+    for k in valores_k:
+        for dist in distancias:
+            # 1. Instanciar y entrenar
+            modelo = Clasificador_kNN(k=k, distancia=dist)
+            modelo.entrenar(train_ds)
+
+            # 2. Predecir y calcular aciertos
+            aciertos = 0
+            for reg_test in test_ds.registros:
+                prediccion = modelo.predecir(reg_test)
+                if prediccion == reg_test.objetivo:
+                    aciertos += 1
+
+            # 3. Calcular bondad (Accuracy)
+            accuracy = aciertos / len(test_ds.registros)
+            print(f"k={k:2} | distancia={dist:10} -> Accuracy: {accuracy:.4f} ({aciertos}/{len(test_ds.registros)})")
+
+            # Guardar el mejor resultado
+            if accuracy > mejor_accuracy:
+                mejor_accuracy = accuracy
+                mejor_config = f"k={k}, distancia={dist}"
+
+    print("-" * 60)
+    print(f"🏆 MEJOR CONFIGURACIÓN: {mejor_config} (Accuracy: {mejor_accuracy:.4f})")
+
+    # =========================================================================
+    # PRUEBA CON DISTANCIA PONDERADA
+    # =========================================================================
+    # Generamos unos pesos de ejemplo (damos el doble de peso al primer atributo)
+    num_atributos = len(registros[0].atributos)
+    pesos_prueba = [1.0] * num_atributos
+    pesos_prueba[0] = 2.0 
+
+    modelo_pond = Clasificador_kNN(k=3, distancia="ponderada", pesos=pesos_prueba)
+    modelo_pond.entrenar(train_ds)
+    aciertos_pond = sum(1 for r in test_ds.registros if modelo_pond.predecir(r) == r.objetivo)
+    acc_pond = aciertos_pond / len(test_ds.registros)
+    
+    print(f"\n⚖️  Prueba Ponderada (k=3, pesos={pesos_prueba}) -> Accuracy: {acc_pond:.4f}")
+
 
 def main():
-    print("--- INICIANDO TEST DE LA CLASE REGISTRO ---")
-    
-    # 1. Crear aleatoriamente 10 objetos Registro de dimensión 4
-    random.seed(42)  # Fijamos la semilla para reproducibilidad
-    lista_registros = []
-    num_atributos = 4
-    
-    for _ in range(10):
-        atributos_aleatorios = [random.uniform(0.0, 10.0) for _ in range(num_atributos)]
-        lista_registros.append(Registro(atributos_aleatorios))
+    # Diccionario con las rutas de los ficheros de prueba
+    archivos = {
+        "iris": "../datos/iris.csv",       # Ajusta esta ruta según tu estructura exacta
+        "wine": "../datos/wine.csv",
+        "diabetes": "../datos/diabetes.csv"
+    }
 
-    print(f"\nSe han creado {len(lista_registros)} registros:")
-    for i, reg in enumerate(lista_registros):
-        print(f"Índice {i}: {reg}")
-
-    # =========================================================================
-    # NUEVA FUNCIONALIDAD: Cálculo dinámico de Mínimos y Máximos del Dataset
-    # =========================================================================
-    print("\n--- CÁLCULO DE MÍNIMOS Y MÁXIMOS REALES ---")
-    
-    # Extraemos todos los atributos en una matriz (lista de listas)
-    matriz_atributos = [reg.atributos for reg in lista_registros]
-    
-    # Usamos zip(*matriz) para agrupar los datos por columnas (atributos)
-    columnas = list(zip(*matriz_atributos))
-    
-    # Calculamos el mínimo y máximo real para cada columna
-    minimos_reales = [min(col) for col in columnas]
-    maximos_reales = [max(col) for col in columnas]
-    
-    print(f"Mínimos calculados por dimensión: {[round(x, 2) for x in minimos_reales]}")
-    print(f"Máximos calculados por dimensión: {[round(x, 2) for x in maximos_reales]}")
+    for nombre, ruta in archivos.items():
+        try:
+            # Creamos el dataset usando nuestra Factoría. 
+            # Asumimos que la etiqueta objetivo está en la última columna (-1)
+            dataset = FactoriaCSV.crear_dataset_clasificacion(ruta, indice_objetivo=-1)
+            evaluar_dataset(dataset, nombre)
+        except FileNotFoundError:
+            print(f"\n[AVISO] No se encontró el archivo '{ruta}'.")
+            print("Asegúrate de tener los CSV en la carpeta correspondiente.")
+        except Exception as e:
+            print(f"\n[ERROR] Problema procesando {ruta}: {e}")
 
     # =========================================================================
-    # Pruebas de los métodos de la clase Registro
+    # RESPUESTA A LA PREGUNTA DEL PROFESOR SOBRE k=1 Y EL OVERFITTING
     # =========================================================================
+    print("\n" + "="*80)
+    print("🧠 REFLEXIÓN TEÓRICA: ¿Qué pasa cuando k=1? (El problema del Overfitting)")
+    print("="*80)
+    texto_overfitting = """
+    Cuando configuramos el algoritmo kNN con k=1, el modelo se vuelve extremadamente 
+    sensible al ruido. Al tomar la decisión basándose en un único vecino, el algoritmo 
+    literalmente "memoriza" el conjunto de datos de entrenamiento en lugar de aprender 
+    los patrones generales.
+
+    Si hiciéramos una prueba intentando predecir los mismos datos que hemos usado 
+    para entrenar, k=1 nos daría un 100% de aciertos (porque el vecino más cercano a un 
+    punto es él mismo). Sin embargo, al probarlo con datos nuevos (nuestro subconjunto 
+    de test), su rendimiento suele caer drásticamente porque las fronteras de decisión 
+    son demasiado abruptas y están ajustadas a casos atípicos.
     
-    reg_objetivo = lista_registros[0]
-    otro_reg = lista_registros[1]
-
-    # 2. Probar cálculos de distancia
-    print("\n--- PRUEBAS DE DISTANCIA (Índice 0 vs Índice 1) ---")
-    dist_euc = reg_objetivo.calcula_distancia(otro_reg, tipo="euclídea")
-    dist_man = reg_objetivo.calcula_distancia(otro_reg, tipo="manhattan")
+    A este fenómeno se le conoce como OVERFITTING o Sobreajuste.
     
-    pesos_prueba = [0.5, 0.2, 0.2, 0.1]
-    dist_pond = reg_objetivo.calcula_distancia(otro_reg, tipo="ponderada", pesos=pesos_prueba)
+    ¿Cómo se resuelve?
+    1. Aumentando el valor de 'k' (k=3, 5, 7...) para suavizar las fronteras de decisión 
+       y requerir un consenso entre varios vecinos.
+    2. Implementando técnicas de Validación Cruzada (Cross-Validation).
+    3. Normalizando los datos (como veremos en el próximo laboratorio) para evitar que 
+       las dimensiones con escalas más grandes dominen la distancia.
+    """
+    print(texto_overfitting)
 
-    print(f"Euclídea: {dist_euc:.4f}")
-    print(f"Manhattan: {dist_man:.4f}")
-    print(f"Ponderada (pesos {pesos_prueba}): {dist_pond:.4f}")
-
-    # 3. Probar normalización con los valores dinámicos
-    print("\n--- PRUEBA DE NORMALIZACIÓN (Índice 0) ---")
-    reg_normalizado = reg_objetivo.normalizar(minimos_reales, maximos_reales)
-    print(f"Original:    {reg_objetivo}")
-    print(f"Normalizado: {reg_normalizado}")
-    print("Nota: Observa cómo los valores normalizados ahora están estrictamente entre 0.0 y 1.0")
-
-    # 4. Probar k_vecinos
-    print("\n--- PRUEBA DE K-VECINOS ---")
-    k = 3
-    # Buscamos los 3 vecinos más cercanos al registro 0
-    indices_cercanos = reg_objetivo.k_vecinos(lista_registros, k, tipo="euclídea")
-    print(f"Los índices de los {k} vecinos más cercanos al Registro 0 son: {indices_cercanos}")
-    
-    # 5. Prueba de validación de errores (Descomenta para probar)
-    # print("\n--- PRUEBA DE MANEJO DE ERRORES ---")
-    # registro_erroneo = Registro([1.0, 2.0, 3.0]) # Dimensión 3 en vez de 4
-    # reg_objetivo.calcula_distancia(registro_erroneo) # Lanzará ValueError
 
 if __name__ == "__main__":
     main()
