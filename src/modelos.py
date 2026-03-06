@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Any
-from dataset import DataSet
-from registro import Registro
+from .dataset import DataSet
+from .registro import Registro
 
 class Modelo(ABC):
     """

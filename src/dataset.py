@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Tuple
-from registro import Registro, RegistroClasificacion, RegistroRegresion
+from .registro import Registro, RegistroClasificacion, RegistroRegresion
 
 class DataSet(ABC):
     """

@@ -1,6 +1,14 @@
+# Pruebas de la segunda parte de la práctica. Lectura y análisis de datasets, con accuracy y número de vecinos. Fecha: 27/02/2026.
+
+import sys
+import os
+
+# Esto añade la carpeta superior a la lista de sitios donde Python busca archivos
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import random
-from factoria import FactoriaCSV, FactoriaXLS
-from modelos import Clasificador_kNN
+from src.factoria import FactoriaCSV, FactoriaXLS # Ahora se importan desde 'src'
+from src.modelos import Clasificador_kNN
 
 def evaluar_dataset(dataset, nombre_dataset):
     """

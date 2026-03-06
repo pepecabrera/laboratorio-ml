@@ -1,6 +1,6 @@
 import csv
-from dataset import DataSetClasificacion, DataSetRegresion
-from registro import RegistroClasificacion, RegistroRegresion
+from .dataset import DataSetClasificacion, DataSetRegresion
+from .registro import RegistroClasificacion, RegistroRegresion
 
 # Importamos openpyxl para Excel. 
 # Nota: Debes instalarlo previamente con 'pip install openpyxl'
