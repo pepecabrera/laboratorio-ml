@@ -1,3 +1,4 @@
+import math
 from abc import ABC, abstractmethod
 from typing import List, Tuple
 from .registro import Registro, RegistroClasificacion, RegistroRegresion
@@ -63,6 +64,30 @@ class DataSet(ABC):
         nuevo_dataset.nombres_atributos = self.nombres_atributos.copy()
         
         return nuevo_dataset
+    
+    def calcular_medias_desviaciones(self) -> Tuple[List[float], List[float]]:
+        """
+        Calcula y devuelve las medias y desviaciones típicas de cada columna de atributos.
+        """
+        if not self.registros:
+            raise ValueError("No hay registros en el DataSet para calcular medias y desviaciones.")
+
+        matriz_atributos = [reg.atributos for reg in self.registros]
+        columnas = list(zip(*matriz_atributos))
+        
+        medias = []
+        desviaciones = []
+        
+        for col in columnas:
+            # Media
+            media = sum(col) / len(col)
+            medias.append(media)
+            
+            # Desviación típica (raíz cuadrada de la varianza)
+            varianza = sum((x - media) ** 2 for x in col) / len(col)
+            desviaciones.append(math.sqrt(varianza))
+            
+        return medias, desviaciones
 
 
 class DataSetClasificacion(DataSet):

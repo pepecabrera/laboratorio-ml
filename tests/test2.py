@@ -61,7 +61,6 @@ def main():
     archivos = {
         "iris": "datos/iris.xlsx",
         "diabetes": "datos/diabetes.csv",
-        "boston": "datos/BostonHousing.csv",
         "wine": "datos/wine/wine.data"  # Ahora busca dentro de la carpeta wine
     }
 

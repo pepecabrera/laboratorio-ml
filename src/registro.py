@@ -91,6 +91,21 @@ class Registro:
         distancias.sort(key=lambda x: x[0])
         indices_k_vecinos = [item[1] for item in distancias[:k]]
         return indices_k_vecinos
+    
+    def estandarizar(self, medias: List[float], desviaciones: List[float]) -> 'Registro':
+        """
+        Devuelve un nuevo registro con los atributos estandarizados (Z-score).
+        """
+        nuevos_atributos = []
+        for i, valor in enumerate(self.atributos):
+            # Evitamos la división por cero si la desviación típica es 0 (todos los valores iguales)
+            if desviaciones[i] == 0:
+                nuevos_atributos.append(0.0)
+            else:
+                nuevos_atributos.append((valor - medias[i]) / desviaciones[i])
+                
+        # Instanciamos un nuevo registro de la misma clase (RegistroClasificacion o Regresion)
+        return self.__class__(nuevos_atributos, self.objetivo)
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}({[round(x, 4) for x in self.atributos]})"
