@@ -1,64 +1,43 @@
 import random
+import math
 from abc import ABC, abstractmethod
-from typing import List, Any
+from typing import List, Any, Optional
 from .dataset import DataSet
 from .modelos import Modelo
 from .preprocesado import Preprocesamiento
 
 class Validacion(ABC):
     """
-    Clase abstracta para validar la capacidad de generalización de un modelo 
-    de Machine Learning utilizando distintas estrategias de partición.
+    Clase abstracta para validar la capacidad de generalización de un modelo.
     """
+    def __init__(self, metrica: str):
+        self.metrica = metrica.lower()
 
     @abstractmethod
     def calcular_metricas(self, predichos: List[Any], reales: List[Any]) -> float:
-        """
-        Calcula la métrica de rendimiento comparando las predicciones con los valores reales.
-        Debe ser implementado por las clases hijas según el tipo de problema (clasificación/regresión).
-        """
         pass
 
-    def validacion_simple(self, modelo: Modelo, dataset: DataSet, porcentaje: float, normalizador: Preprocesamiento = None) -> float:
-        """
-        Aplica la técnica Hold-out dividiendo el dataset en entrenamiento y test.
-        Entrena el modelo y devuelve la métrica calculada sobre las predicciones del test.
-        """
-        # 1. Barajamos los datos para evitar sesgos de orden
+    def validacion_simple(self, modelo: Modelo, dataset: DataSet, porcentaje: float, normalizador: Optional[Preprocesamiento] = None) -> float:
         registros = dataset.registros.copy()
         random.shuffle(registros)
 
-        # 2. Dividimos en train y test
         corte = int(len(registros) * porcentaje)
         train_ds = dataset.crear_subconjunto(registros[:corte])
         test_ds = dataset.crear_subconjunto(registros[corte:])
 
-        # 3. Aplicamos preprocesamiento si existe
         if normalizador is not None:
-            # ¡IMPORTANTE! El normalizador SOLO se ajusta con los datos de entrenamiento
-            # para evitar que el modelo "vea" el futuro (los datos de test).
             normalizador.ajustar(train_ds)
             train_ds = normalizador.transformar_dataSet(train_ds)
             test_ds = normalizador.transformar_dataSet(test_ds)
 
-        # 4. Entrenamos el modelo
         modelo.entrenar(train_ds)
 
-        # 5. Predecimos y extraemos valores reales
-        predichos = []
-        reales = []
-        for reg in test_ds.registros:
-            predichos.append(modelo.predecir(reg))
-            reales.append(reg.objetivo)
+        predichos = [modelo.predecir(reg) for reg in test_ds.registros]
+        reales = [reg.objetivo for reg in test_ds.registros]
 
-        # 6. Calculamos y devolvemos la métrica
         return self.calcular_metricas(predichos, reales)
 
-    def validacion_cruzada(self, modelo: Modelo, dataset: DataSet, m: int, normalizador: Preprocesamiento = None) -> float:
-        """
-        Aplica k-Fold Cross-Validation dividiendo el dataset en m bolsas.
-        Devuelve la media de la métrica obtenida en las m iteraciones.
-        """
+    def validacion_cruzada(self, modelo: Modelo, dataset: DataSet, m: int, normalizador: Optional[Preprocesamiento] = None) -> float:
         registros = dataset.registros.copy()
         random.shuffle(registros)
 
@@ -66,18 +45,14 @@ class Validacion(ABC):
         tam_bolsa = n // m
         bolsas = []
 
-        # Crear las m bolsas
         for i in range(m):
             inicio = i * tam_bolsa
-            # La última bolsa se queda con el resto de elementos si la división no es exacta
             fin = (i + 1) * tam_bolsa if i < m - 1 else n
             bolsas.append(registros[inicio:fin])
 
         metricas_iteraciones = []
 
-        # Realizar el proceso m veces
         for i in range(m):
-            # La bolsa i es el test, el resto (sumadas) son el train
             test_regs = bolsas[i]
             train_regs = []
             for j in range(m):
@@ -87,7 +62,6 @@ class Validacion(ABC):
             train_ds = dataset.crear_subconjunto(train_regs)
             test_ds = dataset.crear_subconjunto(test_regs)
 
-            # Preprocesamiento en cada iteración
             if normalizador is not None:
                 normalizador.ajustar(train_ds)
                 train_ds = normalizador.transformar_dataSet(train_ds)
@@ -95,48 +69,113 @@ class Validacion(ABC):
 
             modelo.entrenar(train_ds)
 
-            # Predicciones
             predichos = [modelo.predecir(reg) for reg in test_ds.registros]
             reales = [reg.objetivo for reg in test_ds.registros]
 
-            # Calcular y guardar métrica de esta iteración
-            metrica_actual = self.calcular_metricas(predichos, reales)
-            metricas_iteraciones.append(metrica_actual)
+            metricas_iteraciones.append(self.calcular_metricas(predichos, reales))
 
-        # Devolver la media de las m métricas
         return sum(metricas_iteraciones) / m
 
 
 class ValidacionClasificacion(Validacion):
     """
-    Clase concreta para validar problemas de clasificación.
-    Usa la precisión (Accuracy) como métrica por defecto.
+    Validador para problemas de clasificación.
+    Métricas soportadas: 'accuracy' (Precisión), 'error_rate' (Tasa de error).
     """
+    def __init__(self, metrica: str = "accuracy"):
+        super().__init__(metrica)
 
     def calcular_metricas(self, predichos: List[str], reales: List[str]) -> float:
-        """
-        Calcula la Accuracy: (Número de aciertos) / (Total de registros).
-        """
         if not predichos or len(predichos) != len(reales):
-            raise ValueError("Las listas de predicciones y reales deben tener la misma longitud y no estar vacías.")
+            raise ValueError("Las listas de predicciones y reales deben tener la misma longitud.")
 
         aciertos = sum(1 for p, r in zip(predichos, reales) if p == r)
-        return aciertos / len(reales)
+        accuracy = aciertos / len(reales)
+
+        if self.metrica == "error_rate":
+            return 1.0 - accuracy
+        
+        return accuracy # Por defecto
 
 
 class ValidacionRegresion(Validacion):
     """
-    Clase concreta para validar problemas de regresión.
-    Usa el Error Absoluto Medio (MAE) como métrica por defecto.
+    Validador para problemas de regresión.
+    Métricas soportadas: 'mae' (Error Absoluto Medio), 'mse' (Error Cuadrático Medio), 'rmse' (Raíz del MSE).
     """
+    def __init__(self, metrica: str = "mae"):
+        super().__init__(metrica)
 
     def calcular_metricas(self, predichos: List[float], reales: List[float]) -> float:
-        """
-        Calcula el MAE (Mean Absolute Error): Media de las diferencias absolutas.
-        """
         if not predichos or len(predichos) != len(reales):
-            raise ValueError("Las listas de predicciones y reales deben tener la misma longitud y no estar vacías.")
+            raise ValueError("Las listas de predicciones y reales deben tener la misma longitud.")
 
-        # Sumamos el valor absoluto de la diferencia entre la predicción y la realidad
-        error_total = sum(abs(p - r) for p, r in zip(predichos, reales))
-        return error_total / len(reales)
+        n = len(reales)
+        
+        if self.metrica == "mse":
+            return sum((r - p) ** 2 for r, p in zip(reales, predichos)) / n
+            
+        elif self.metrica == "rmse":
+            return math.sqrt(sum((r - p) ** 2 for r, p in zip(reales, predichos)) / n)
+            
+        else: # MAE por defecto
+            return sum(abs(r - p) for r, p in zip(reales, predichos)) / n
+
+
+class SeleccionAtributos:
+    """
+    Clase encargada de analizar y seleccionar los mejores atributos de un DataSet.
+    """
+    
+    def seleccion_correlacion(self, dataset: DataSet, p: float) -> List[int]:
+        """
+        Calcula la correlación de Pearson de cada atributo con el objetivo.
+        Devuelve los índices del 'p' porcentaje (0.0 a 1.0) de los atributos MÁS correlados.
+        """
+        if not dataset.registros:
+            return []
+        if not (0.0 < p <= 1.0):
+            raise ValueError("El porcentaje 'p' debe estar entre 0.0 (exclusivo) y 1.0 (inclusivo).")
+
+        n_atributos = len(dataset.registros[0].atributos)
+        n_registros = len(dataset.registros)
+
+        # 1. Extraer los valores objetivo (Y). Deben ser numéricos.
+        try:
+            valores_y = [float(reg.objetivo) for reg in dataset.registros]
+        except ValueError:
+            raise ValueError("El objetivo debe ser numérico para calcular Pearson (use DataSetRegresion).")
+
+        media_y = sum(valores_y) / n_registros
+        correlaciones = [] # Guardará tuplas: (índice_atributo, valor_correlacion_absoluta)
+
+        # 2. Calcular Pearson para cada columna (X)
+        for i in range(n_atributos):
+            valores_x = [reg.atributos[i] for reg in dataset.registros]
+            media_x = sum(valores_x) / n_registros
+
+            numerador = sum((x - media_x) * (y - media_y) for x, y in zip(valores_x, valores_y))
+            suma_sq_x = sum((x - media_x) ** 2 for x in valores_x)
+            suma_sq_y = sum((y - media_y) ** 2 for y in valores_y)
+
+            denominador = math.sqrt(suma_sq_x * suma_sq_y)
+
+            # Evitar división por cero si una columna tiene todos sus valores iguales
+            if denominador == 0:
+                r = 0.0
+            else:
+                r = numerador / denominador
+
+            # Guardamos el índice y el valor absoluto de 'r' (nos importan tanto los positivos como negativos fuertes)
+            correlaciones.append((i, abs(r)))
+
+        # 3. Ordenar los atributos de mayor a menor correlación
+        correlaciones.sort(key=lambda x: x[1], reverse=True)
+
+        # 4. Calcular cuántos atributos nos quedamos según el porcentaje 'p'
+        num_a_seleccionar = max(1, int(n_atributos * p))
+
+        # 5. Extraer los índices de los ganadores y devolverlos
+        indices_ganadores = [tupla[0] for tupla in correlaciones[:num_a_seleccionar]]
+        
+        return indices_ganadores

@@ -88,6 +88,43 @@ class DataSet(ABC):
             desviaciones.append(math.sqrt(varianza))
             
         return medias, desviaciones
+    
+    def eliminar_atributos(self, indices_a_eliminar: List[int]) -> 'DataSet':
+        """
+        Devuelve un nuevo DataSet eliminando las columnas especificadas por los índices.
+        Comprueba que los índices estén dentro del rango lógico de los atributos.
+        """
+        if not self.registros:
+            return self.__class__() # Devuelve un DataSet vacío del mismo tipo
+
+        num_atributos = len(self.registros[0].atributos)
+        
+        # 1. Validar que los índices son correctos
+        for idx in indices_a_eliminar:
+            if idx < 0 or idx >= num_atributos:
+                raise ValueError(f"Índice {idx} fuera de rango. Debe estar entre 0 y {num_atributos - 1}.")
+
+        # 2. Instanciar el nuevo DataSet
+        nuevo_dataset = self.__class__()
+        
+        # 3. Mantener las cabeceras actualizadas (si existen)
+        if hasattr(self, 'cabeceras') and self.cabeceras:
+            # Filtramos las cabeceras de los atributos
+            cabeceras_atributos = [cab for i, cab in enumerate(self.cabeceras[:-1]) if i not in indices_a_eliminar]
+            # Añadimos la cabecera del objetivo al final
+            cabeceras_atributos.append(self.cabeceras[-1])
+            nuevo_dataset.set_cabeceras(cabeceras_atributos)
+
+        # 4. Crear los nuevos registros recortados
+        for reg in self.registros:
+            # Nos quedamos solo con los valores cuyo índice NO esté en la lista negra
+            nuevos_atributos = [val for i, val in enumerate(reg.atributos) if i not in indices_a_eliminar]
+            
+            # Instanciamos un nuevo registro de la misma clase (Clasificacion o Regresion)
+            nuevo_registro = reg.__class__(nuevos_atributos, reg.objetivo)
+            nuevo_dataset.agregar_registro(nuevo_registro)
+
+        return nuevo_dataset
 
 
 class DataSetClasificacion(DataSet):
