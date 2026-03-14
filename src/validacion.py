@@ -19,7 +19,7 @@ class Validacion(ABC):
 
     def validacion_simple(self, modelo: Modelo, dataset: DataSet, porcentaje: float, normalizador: Optional[Preprocesamiento] = None) -> float:
         registros = dataset.registros.copy()
-        random.shuffle(registros)
+        #random.shuffle(registros)
 
         corte = int(len(registros) * porcentaje)
         train_ds = dataset.crear_subconjunto(registros[:corte])
@@ -39,7 +39,7 @@ class Validacion(ABC):
 
     def validacion_cruzada(self, modelo: Modelo, dataset: DataSet, m: int, normalizador: Optional[Preprocesamiento] = None) -> float:
         registros = dataset.registros.copy()
-        random.shuffle(registros)
+        #random.shuffle(registros)
 
         n = len(registros)
         tam_bolsa = n // m
@@ -140,27 +140,40 @@ class SeleccionAtributos:
         n_atributos = len(dataset.registros[0].atributos)
         n_registros = len(dataset.registros)
 
-        # 1. Extraer los valores objetivo (Y). Deben ser numéricos.
+        # 1. Extraer los valores objetivo (Y).
         try:
+            # Intento 1: Asumimos que es Regresión (números puros)
             valores_y = [float(reg.objetivo) for reg in dataset.registros]
         except ValueError:
-            raise ValueError("El objetivo debe ser numérico para calcular Pearson (use DataSetRegresion).")
+            # Intento 2: TRUCO SENIOR (Correlación Biserial Puntual)
+            # Si son etiquetas de texto (Clasificación), extraemos las clases únicas
+            clases_unicas = list(set(reg.objetivo for reg in dataset.registros))
+            
+            if len(clases_unicas) == 2:
+                # Si es clasificación binaria ('M' y 'B'), mapeamos a 0.0 y 1.0
+                mapa_clases = {clases_unicas[0]: 0.0, clases_unicas[1]: 1.0}
+                valores_y = [mapa_clases[reg.objetivo] for reg in dataset.registros]
+            else:
+                # Si hay 3 o más clases, Pearson no sirve.
+                raise ValueError("Pearson solo soporta Regresión o Clasificación Binaria (2 clases).")
 
+        # 2. OPTIMIZACIÓN: Calcular Y una sola vez
         media_y = sum(valores_y) / n_registros
-        correlaciones = [] # Guardará tuplas: (índice_atributo, valor_correlacion_absoluta)
+        suma_sq_y = sum((y - media_y) ** 2 for y in valores_y)
+        
+        correlaciones = []
 
-        # 2. Calcular Pearson para cada columna (X)
+        # 3. Calcular Pearson para cada columna (X)
         for i in range(n_atributos):
             valores_x = [reg.atributos[i] for reg in dataset.registros]
+            
             media_x = sum(valores_x) / n_registros
-
-            numerador = sum((x - media_x) * (y - media_y) for x, y in zip(valores_x, valores_y))
             suma_sq_x = sum((x - media_x) ** 2 for x in valores_x)
-            suma_sq_y = sum((y - media_y) ** 2 for y in valores_y)
-
+            
+            numerador = sum((x - media_x) * (y - media_y) for x, y in zip(valores_x, valores_y))
             denominador = math.sqrt(suma_sq_x * suma_sq_y)
 
-            # Evitar división por cero si una columna tiene todos sus valores iguales
+            # Evitar división por cero si una columna tiene todos sus valores iguales (varianza 0)
             if denominador == 0:
                 r = 0.0
             else:
@@ -169,13 +182,13 @@ class SeleccionAtributos:
             # Guardamos el índice y el valor absoluto de 'r' (nos importan tanto los positivos como negativos fuertes)
             correlaciones.append((i, abs(r)))
 
-        # 3. Ordenar los atributos de mayor a menor correlación
+        # 4. Ordenar los atributos de mayor a menor correlación
         correlaciones.sort(key=lambda x: x[1], reverse=True)
 
-        # 4. Calcular cuántos atributos nos quedamos según el porcentaje 'p'
+        # 5. Calcular cuántos atributos nos quedamos según el porcentaje 'p'
         num_a_seleccionar = max(1, int(n_atributos * p))
 
-        # 5. Extraer los índices de los ganadores y devolverlos
+        # 6. Extraer los índices de los ganadores y devolverlos
         indices_ganadores = [tupla[0] for tupla in correlaciones[:num_a_seleccionar]]
         
         return indices_ganadores

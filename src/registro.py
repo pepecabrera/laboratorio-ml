@@ -82,10 +82,9 @@ class Registro:
         """
         distancias = []
         for indice, registro in enumerate(lista_registros):
+            dist = self.calcula_distancia(registro, tipo, pesos)
             if registro is self:
                 continue
-                
-            dist = self.calcula_distancia(registro, tipo, pesos)
             distancias.append((dist, indice))
             
         distancias.sort(key=lambda x: x[0])

@@ -60,9 +60,15 @@ class DataSet(ABC):
         # self.__class__() instanciará DataSetClasificacion o DataSetRegresion
         nuevo_dataset = self.__class__()
         # Copiamos los registros y las cabeceras
-        nuevo_dataset.registros = lista_registros.copy()
         nuevo_dataset.nombres_atributos = self.nombres_atributos.copy()
         
+        nuevos_registros = []
+        for reg in lista_registros:
+            nuevo_reg = reg.__class__(reg.atributos.copy(), reg.objetivo)
+            nuevos_registros.append(nuevo_reg)
+
+        nuevo_dataset.registros = nuevos_registros
+
         return nuevo_dataset
     
     def calcular_medias_desviaciones(self) -> Tuple[List[float], List[float]]:

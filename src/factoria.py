@@ -144,3 +144,84 @@ class FactoriaXLS:
             dataset.agregar_registro(registro)
             
         return dataset
+    
+# Importamos xlrd para soportar archivos Excel antiguos (.xls)
+try:
+    import xlrd
+except ImportError:
+    xlrd = None
+
+
+class FactoriaOldXLS:
+    """Clase factoría para crear DataSets a partir de archivos Excel antiguos (.xls)."""
+
+    @staticmethod
+    def _comprobar_libreria():
+        if xlrd is None:
+            raise ImportError("La librería 'xlrd' es obligatoria para leer .xls. Ejecuta 'pip install xlrd'.")
+
+    @staticmethod
+    def crear_dataset_clasificacion(ruta_fichero: str, indice_objetivo: int = -1) -> DataSetClasificacion:
+        FactoriaOldXLS._comprobar_libreria()
+        dataset = DataSetClasificacion()
+
+        wb = xlrd.open_workbook(ruta_fichero)
+        sheet = wb.sheet_by_index(0)
+
+        if sheet.nrows == 0:
+            return dataset
+
+        # 1. Cabeceras
+        cabeceras = sheet.row_values(0)
+        obj_header = cabeceras.pop(indice_objetivo)
+        cabeceras.append(obj_header)
+        dataset.set_cabeceras([str(c) for c in cabeceras])
+
+        # 2. Datos
+        for i in range(1, sheet.nrows):
+            fila = sheet.row_values(i)
+
+            if not any(fila):
+                continue
+
+            fila_lista = list(fila)
+            objetivo = str(fila_lista.pop(indice_objetivo)).strip()
+            atributos = [float(x) for x in fila_lista]
+
+            registro = RegistroClasificacion(atributos, objetivo)
+            dataset.agregar_registro(registro)
+
+        return dataset
+
+    @staticmethod
+    def crear_dataset_regresion(ruta_fichero: str, indice_objetivo: int = -1) -> DataSetRegresion:
+        FactoriaOldXLS._comprobar_libreria()
+        dataset = DataSetRegresion()
+
+        wb = xlrd.open_workbook(ruta_fichero)
+        sheet = wb.sheet_by_index(0)
+
+        if sheet.nrows == 0:
+            return dataset
+
+        # 1. Cabeceras
+        cabeceras = sheet.row_values(0)
+        obj_header = cabeceras.pop(indice_objetivo)
+        cabeceras.append(obj_header)
+        dataset.set_cabeceras([str(c) for c in cabeceras])
+
+        # 2. Datos
+        for i in range(1, sheet.nrows):
+            fila = sheet.row_values(i)
+
+            if not any(fila):
+                continue
+
+            fila_lista = list(fila)
+            objetivo = float(fila_lista.pop(indice_objetivo))
+            atributos = [float(x) for x in fila_lista]
+
+            registro = RegistroRegresion(atributos, objetivo)
+            dataset.agregar_registro(registro)
+
+        return dataset

@@ -31,7 +31,7 @@ class Clasificador_kNN(Modelo):
     """
     Modelo de clasificación basado en los k vecinos más cercanos (k-Nearest Neighbors).
     """
-    def __init__(self, k: int, distancia: str = "euclídea", pesos: List[float] = None):
+    def __init__(self, k: int, distancia: str = "euclidea", pesos: List[float] = None):
         super().__init__()  # Llama al constructor de Modelo para inicializar datos_entrenamiento
         self.k = k
         self.distancia = distancia
@@ -96,9 +96,10 @@ class Regresor_kNN(Modelo):
     Modelo de regresión basado en los k vecinos más cercanos.
     Predice el valor calculando la media de los valores de sus k vecinos.
     """
-    def __init__(self, k: int = 3, distancia: str = "euclidea"):
+    def __init__(self, k: int = 3, distancia: str = "euclidea", pesos: str = "uniforme"):
         self.k = k
         self.distancia = distancia
+        self.pesos = pesos
         self.datos_entrenamiento: List[Registro] = []
 
     def entrenar(self, dataset: DataSet):
@@ -114,8 +115,8 @@ class Regresor_kNN(Modelo):
         suma_valores = 0.0
         for i in indices_vecinos:
             vecino_real = self.datos_entrenamiento[i]
-            suma_valores += float(vecino_real.objetivo)
-            
+            suma_valores += float(vecino_real.objetivo) 
+        
         return suma_valores / self.k
 
 
