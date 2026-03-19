@@ -114,12 +114,10 @@ class DataSet(ABC):
         nuevo_dataset = self.__class__()
         
         # 3. Mantener las cabeceras actualizadas (si existen)
-        if hasattr(self, 'cabeceras') and self.cabeceras:
-            # Filtramos las cabeceras de los atributos
-            cabeceras_atributos = [cab for i, cab in enumerate(self.cabeceras[:-1]) if i not in indices_a_eliminar]
-            # Añadimos la cabecera del objetivo al final
-            cabeceras_atributos.append(self.cabeceras[-1])
-            nuevo_dataset.set_cabeceras(cabeceras_atributos)
+        if self.nombres_atributos:
+            # Filtramos los nombres de los atributos
+            nuevos_nombres = [nom for i, nom in enumerate(self.nombres_atributos) if i not in indices_a_eliminar]
+            nuevo_dataset.nombres_atributos = nuevos_nombres
 
         # 4. Crear los nuevos registros recortados
         for reg in self.registros:
