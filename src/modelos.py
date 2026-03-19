@@ -97,24 +97,24 @@ class Regresor_kNN(Modelo):
     Predice el valor calculando la media de los valores de sus k vecinos.
     """
     def __init__(self, k: int = 3, distancia: str = "euclidea", pesos: str = "uniforme"):
+        super().__init__()
         self.k = k
         self.distancia = distancia
         self.pesos = pesos
-        self.datos_entrenamiento: List[Registro] = []
 
     def entrenar(self, dataset: DataSet):
         """Memoriza los datos de entrenamiento."""
-        self.datos_entrenamiento = dataset.registros
+        self.datos_entrenamiento = dataset
 
     def predecir(self, registro: Registro) -> float:
         """Devuelve la media del atributo objetivo de los k vecinos más cercanos."""
         # Ahora sabemos que esto devuelve índices (ej: [12, 45, 3])
-        indices_vecinos = registro.k_vecinos(self.datos_entrenamiento, self.k, self.distancia)
+        indices_vecinos = registro.k_vecinos(self.datos_entrenamiento.registros, self.k, self.distancia)
         
         # Buscamos cada registro en nuestra lista de entrenamiento usando el índice
         suma_valores = 0.0
         for i in indices_vecinos:
-            vecino_real = self.datos_entrenamiento[i]
+            vecino_real = self.datos_entrenamiento.registros[i]
             suma_valores += float(vecino_real.objetivo) 
         
         return suma_valores / self.k
@@ -126,6 +126,7 @@ class Clasificador_centroide(Modelo):
     Asigna al nuevo registro la etiqueta del centroide más cercano.
     """
     def __init__(self, distancia: str = "euclidea"):
+        super().__init__()
         self.distancia = distancia
         # Diccionario para guardar {etiqueta_clase: Registro_centroide}
         self.centroides: Dict[str, Registro] = {}
@@ -177,6 +178,7 @@ class Regresor_lineal_multiple(Modelo):
     (aproximación heurística) para encontrar los pesos de la recta de regresión.
     """
     def __init__(self, learning_rate: float = 0.01, epocas: int = 1000):
+        super().__init__()
         self.learning_rate = learning_rate
         self.epocas = epocas
         self.pesos: List[float] = []
